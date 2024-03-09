@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestInMemoryImpl(t *testing.T) {
@@ -22,12 +22,8 @@ func TestRedisImpl(t *testing.T) {
 		return
 	}
 	defer client.Close()
-	// environment.InitializeEnvs(environment.VARIANT_TEST)
-	// logger.InitializeLogger()
-	// piceredis.InitializeRedisMap([]piceredis.EnumRedisDb{piceredis.REDIS_CREDIT_DB})
 
 	limiter, err := NewRedisTokenBucket(ctx, client, "myTokenBucket", 5, 2)
-	// limiter, err := NewRedisTokenBucket(ctx, piceredis.DefaultClient(&ctx), "myTokenBucket", 5, 2)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -81,13 +77,12 @@ func doExample(t *testing.T, limiter RateLimiter, capacity int64, rate int) {
 	}
 }
 
-func newRedisClient(ctx context.Context) (*redis.Client, error) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
+func newRedisClient(ctx context.Context) (redis.UniversalClient, error) {
+	client := redis.NewUniversalClient(&redis.UniversalOptions{
+		Addrs:    []string{"127.0.0.1:6379"},
 		Password: "XXXX",
 		DB:       0,
 	})
-
 	_, err := client.Ping(ctx).Result()
 	if err != nil {
 		return nil, err

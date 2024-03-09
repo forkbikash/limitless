@@ -2,19 +2,19 @@ package limitless
 
 import (
 	"context"
+	"errors"
 	"math"
 	"strconv"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 // redis implementation is a better alternative
 
 type redisTokenBucket struct {
-	pipe       redis.Pipeliner
 	context    context.Context
-	client     *redis.Client
+	client     redis.UniversalClient
 	key        string
 	capacity   int64
 	rate       int
@@ -22,26 +22,24 @@ type redisTokenBucket struct {
 	lastUpdate time.Time
 }
 
-func NewRedisTokenBucket(ctx context.Context, client *redis.Client, key string, capacity int64, rate int) (*redisTokenBucket, error) {
-	pipe := client.TxPipeline()
-	defer pipe.Close()
+func NewRedisTokenBucket(ctx context.Context, client redis.UniversalClient, key string, capacity int64, rate int) (*redisTokenBucket, error) {
+	acquired, err := acquireLock(&ctx, client, key)
+	if err != nil || !acquired {
+		return nil, errors.New("error acquiring lock")
+	}
+	defer releaseLock(&ctx, client, key)
 
-	state, err := pipe.HGetAll(ctx, key).Result()
+	state, err := client.HGetAll(ctx, key).Result()
 	if isNonNilErr(err) {
 		return nil, err
 	}
 
 	if err == redis.Nil {
 		lastAccess := time.Now()
-		_ = pipe.HSet(ctx, key,
+		_ = client.HSet(ctx, key,
 			"last_access", strconv.FormatInt(lastAccess.Unix(), 10),
 			"last_tokens", strconv.FormatInt(capacity, 10),
 		)
-
-		_, err := pipe.Exec(ctx)
-		if err != nil {
-			return nil, err
-		}
 
 		return &redisTokenBucket{
 			context:    ctx,
@@ -75,10 +73,13 @@ func NewRedisTokenBucket(ctx context.Context, client *redis.Client, key string, 
 }
 
 func (tb *redisTokenBucket) allow() (*bool, error) {
-	tb.pipe = tb.client.TxPipeline()
-	defer tb.pipe.Close()
+	acquired, err := acquireLock(&tb.context, tb.client, tb.key)
+	if err != nil || !acquired {
+		return nil, errors.New("error acquiring lock")
+	}
+	defer releaseLock(&tb.context, tb.client, tb.key)
 
-	err := tb.load()
+	err = tb.load()
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +100,7 @@ func (tb *redisTokenBucket) allow() (*bool, error) {
 }
 
 func (tb *redisTokenBucket) load() error {
-	state, err := tb.pipe.HGetAll(tb.context, tb.key).Result()
+	state, err := tb.client.HGetAll(tb.context, tb.key).Result()
 	if err != nil {
 		return err
 	}
@@ -137,14 +138,11 @@ func (tb *redisTokenBucket) exhaust() error {
 		tb.tokens--
 	}
 	now := time.Now()
-	_ = tb.pipe.HSet(tb.context, tb.key,
+	_ = tb.client.HSet(tb.context, tb.key,
 		"last_access", strconv.FormatInt(now.Unix(), 10),
 		"last_tokens", strconv.FormatFloat(float64(tb.tokens), 'f', -1, 64),
 	)
-	_, err := tb.pipe.Exec(tb.context)
-	if err != nil {
-		return err
-	}
+
 	tb.lastUpdate = now
 
 	return nil
