@@ -11,7 +11,7 @@ import (
 
 func TestInMemoryImpl(t *testing.T) {
 	limiter := NewInMemoryTokenBucket(5, 2)
-	doExample(t, limiter, 5, 2)
+	executeExample(t, limiter, 5, 2)
 }
 
 func TestRedisImpl(t *testing.T) {
@@ -28,10 +28,10 @@ func TestRedisImpl(t *testing.T) {
 		fmt.Println(err)
 		return
 	}
-	doExample(t, limiter, 5, 2)
+	executeExample(t, limiter, 5, 2)
 }
 
-func doExample(t *testing.T, limiter RateLimiter, capacity int64, rate int) {
+func executeExample(t *testing.T, limiter RateLimiter, capacity int64, rate int) {
 	// rate limit does not exceed
 	failed := false
 	for i := 0; i < 10; i++ {
