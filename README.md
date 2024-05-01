@@ -1,6 +1,9 @@
-# Limitless
+# limitless
 
-Limitless is a Go package that provides rate-limiting functionality using the token bucket algorithm. It offers in-memory and Redis-based implementations of the token bucket, allowing you to control the rate of requests or operations in your application.
+[![Go Reference](https://pkg.go.dev/badge/github.com/forkbikash/limitless.svg)](https://pkg.go.dev/github.com/forkbikash/limitless)
+[![Go Report Card](https://goreportcard.com/badge/github.com/forkbikash/limitless)](https://goreportcard.com/report/github.com/forkbikash/limitless)
+
+`limitless` is a Go package that provides rate-limiting functionality using the token bucket algorithm. It offers in-memory and Redis-based implementations of the token bucket, allowing you to control the rate of requests or operations in your application.
 
 ## Features
 
